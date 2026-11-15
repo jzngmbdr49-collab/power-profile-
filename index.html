@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#EDF1F4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0C171E" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Power Profile">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Power Profile</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: guided timer column (sticky on wide screens) beside results, power-profile chart and rider type; stacks on phones. */
+:root{
+  --bg:#EDF1F4; --panel:#FFFFFF; --ink:#13222C; --muted:#5A6B77; --line:#D3DCE3;
+  --accent:#0B6E78; --accent-ink:#FFFFFF;
+  --display:'Barlow Condensed','Arial Narrow',Arial,sans-serif;
+  --body:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0C171E; --panel:#13232D; --ink:#E6EEF2; --muted:#93A5B1; --line:#263B47;
+    --accent:#4FC3CE; --accent-ink:#06242A;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0C171E; --panel:#13232D; --ink:#E6EEF2; --muted:#93A5B1; --line:#263B47;
+  --accent:#4FC3CE; --accent-ink:#06242A;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--ink); font-family:var(--body); font-size:15px; line-height:1.5;
+  padding-top:calc(22px + env(safe-area-inset-top,0px));
+  padding-bottom:calc(56px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+.wrap{max-width:1040px;margin:0 auto}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(36px,7vw,52px);line-height:1;letter-spacing:.01em;text-transform:uppercase;margin:0;text-wrap:balance}
+h2{font-family:var(--display);font-weight:600;font-size:20px;letter-spacing:.04em;text-transform:uppercase;margin:0 0 12px;text-wrap:balance}
+.sub{color:var(--muted);margin:8px 0 0;max-width:50ch}
+.top{display:flex;flex-wrap:wrap;gap:14px 24px;align-items:flex-end;justify-content:space-between;margin-bottom:16px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{font:inherit;font-weight:600;font-size:13px;padding:8px 12px;border:0;background:transparent;color:var(--ink);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.lab{display:block;font-size:12px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+.rider{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;margin-bottom:16px}
+.rider .field{flex:0 0 170px}
+.rider .field.sx{flex:0 0 210px}
+.rider p{flex:1 1 240px;margin:0;color:var(--muted);font-size:13px}
+.field label{display:block;font-size:13px;font-weight:600;margin-bottom:4px}
+.in{position:relative}
+input[type=number],select{width:100%;font:inherit;font-size:16px;font-variant-numeric:tabular-nums;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 12px}
+.in input{padding-right:40px}
+.suf{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--muted);pointer-events:none}
+
+.bench{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+.stack{display:grid;gap:16px;align-content:start;min-width:0}
+@media (min-width:860px){
+  .bench{grid-template-columns:minmax(0,380px) minmax(0,1fr)}
+  .bench>.stack:first-child{position:sticky;top:16px;align-self:start}
+}
+
+.chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:8px}
+.chip{font:inherit;display:flex;flex-direction:column;align-items:flex-start;gap:0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);cursor:pointer;text-align:left}
+.chip span{font-family:var(--display);font-weight:600;font-size:22px;line-height:1.1}
+.chip small{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip[aria-pressed="true"] small{color:var(--accent-ink)}
+.chip:disabled{opacity:.55;cursor:default}
+
+.timer{border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:14px;background:var(--bg)}
+.timer input{background:var(--panel)}
+.clock{font-family:var(--display);font-weight:600;font-size:clamp(84px,24vw,128px);line-height:1;font-variant-numeric:tabular-nums;margin:6px 0 4px}
+.prog{height:10px;border-radius:5px;background:var(--line);overflow:hidden;margin:8px 0 10px}
+.prog span{display:block;height:100%;width:0;background:var(--accent)}
+.tip{margin:6px 0 0;font-size:14px;min-height:1.5em}
+.timer[data-phase="go"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.timer[data-phase="go"] .lab{color:var(--accent-ink)}
+.timer[data-phase="go"] .prog{background:color-mix(in srgb,var(--accent-ink) 25%,transparent)}
+.timer[data-phase="go"] .prog span{background:var(--accent-ink)}
+.btnrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.btn{font:inherit;font-weight:600;min-height:44px;padding:10px 18px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.hint{font-size:12px;color:var(--muted);margin:6px 0 0}
+.opts{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;margin-top:14px}
+.opts .field{flex:0 0 150px}
+.chk{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;min-height:40px}
+.chk input{width:18px;height:18px;accent-color:var(--accent)}
+
+.row{display:grid;grid-template-columns:50px 116px minmax(0,1fr);gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.dl{font-family:var(--display);font-weight:600;font-size:22px}
+.res{min-width:0}
+.k{display:block;font-family:var(--display);font-weight:600;font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
+.k small{font-size:13px;color:var(--muted);margin-left:3px;font-family:var(--body);font-weight:500}
+.lv{display:block;font-size:13px;line-height:1.3;min-height:1.3em}
+.lv small{display:block;color:var(--muted);font-size:12px}
+.lv em{font-style:normal;color:var(--muted);font-size:12px;margin-left:4px}
+.zs{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.note{color:var(--muted);font-size:13px;margin:10px 0 0}
+.note.small{margin-top:16px;max-width:80ch}
+.clear{margin-top:12px}
+
+.chartbox{min-width:0;overflow:hidden}
+.chartbox svg{display:block;max-width:100%}
+.grid{stroke:var(--line);stroke-width:1;fill:none}
+.axis{stroke:var(--muted);stroke-width:1;fill:none}
+.tick{fill:var(--muted);font-family:var(--body);font-size:12px}
+.ref{stroke:var(--muted);stroke-width:1.2;stroke-dasharray:4 4;fill:none}
+.rlab{fill:var(--muted);font-family:var(--body);font-size:11px;font-weight:600;paint-order:stroke;stroke:var(--panel);stroke-width:3px;stroke-linejoin:round}
+.ln{stroke:var(--accent);stroke-width:2.5;fill:none;stroke-linejoin:round}
+.pt{fill:var(--accent);stroke:var(--panel);stroke-width:2}
+.plab{fill:var(--ink);font-family:var(--body);font-weight:600;font-size:12px;paint-order:stroke;stroke:var(--panel);stroke-width:4px;stroke-linejoin:round}
+.typ{font-family:var(--display);font-weight:600;font-size:34px;line-height:1.1;margin:0 0 6px;text-transform:uppercase}
+.typp{margin:0 0 8px}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+button,select,input{touch-action:manipulation}
+.live{margin-bottom:16px}
+.livehead{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between}
+.livehead h2{margin-bottom:4px}
+.nomargin{margin:0!important}
+.livegrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.livegrid .big{display:block;font-family:var(--display);font-weight:600;font-size:clamp(34px,9vw,56px);line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.livegrid .big small{font-size:.36em;color:var(--muted);margin-left:4px}
+.live-avg{font-weight:600}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Power Profile</h1>
+      <p class="sub">Go as hard as you can for set times, log the average watts, and see your W/kg for each one.</p>
+    </div>
+    <div class="seg" role="group" aria-label="Weight units">
+      <button type="button" id="u-metric" aria-pressed="true">kg</button>
+      <button type="button" id="u-imperial" aria-pressed="false">lb</button>
+    </div>
+  </header>
+
+  <div class="card rider">
+    <div class="field">
+      <label for="weight">Your weight</label>
+      <div class="in"><input id="weight" type="number" inputmode="decimal" step="0.1" min="30" value="75"><span class="suf" data-kind="mass">kg</span></div>
+    </div>
+    <div class="field sx">
+      <label for="sex">Compare me with</label>
+      <select id="sex">
+        <option value="m" selected>Men's benchmarks</option>
+        <option value="f">Women's benchmarks</option>
+      </select>
+    </div>
+    <p>Body weight only, without the bike. Everything is saved in this browser.</p>
+  </div>
+
+  <div class="card live" id="live">
+    <div class="livehead">
+      <div>
+        <h2>Power meter</h2>
+        <p class="note nomargin" id="bt-status">Not connected. Pair a Bluetooth power meter or smart trainer.</p>
+      </div>
+      <div class="btnrow nomargin">
+        <button type="button" class="btn primary" id="bt-connect">Connect power meter</button>
+        <button type="button" class="btn" id="bt-disconnect" hidden>Disconnect</button>
+      </div>
+    </div>
+    <div class="livegrid" id="livegrid" hidden>
+      <div><span class="lab">Power now</span><span class="big"><span id="lv-w">0</span><small>W</small></span></div>
+      <div><span class="lab">3 s average</span><span class="big"><span id="lv-a">0</span><small>W</small></span></div>
+      <div><span class="lab">Now per kilo</span><span class="big"><span id="lv-k">0.0</span><small>W/kg</small></span></div>
+    </div>
+  </div>
+
+  <div class="bench">
+    <div class="stack">
+      <div class="card">
+        <h2>Run a test</h2>
+        <div id="chips" class="chips" role="group" aria-label="Effort length"></div>
+
+        <div class="timer" id="timer" data-phase="idle">
+          <span class="lab" id="t-label" aria-live="polite">Selected: 30 seconds</span>
+          <div class="clock" id="clock">0:30</div>
+          <div class="prog" id="prog-wrap" hidden><span id="prog"></span></div>
+          <p class="tip" id="t-tip"></p>
+          <p class="tip live-avg" id="t-live" hidden></p>
+          <div id="enter-box" hidden>
+            <div class="field">
+              <label for="entry">Average power for the effort</label>
+              <div class="in"><input id="entry" type="number" inputmode="decimal" min="0" step="1"><span class="suf">W</span></div>
+              <p class="hint" id="entry-hint"></p>
+            </div>
+            <div class="btnrow">
+              <button type="button" class="btn primary" id="t-save">Save result</button>
+              <button type="button" class="btn" id="t-discard">Discard</button>
+            </div>
+          </div>
+          <div class="btnrow" id="t-btns">
+            <button type="button" class="btn primary" id="t-start">Start test</button>
+            <button type="button" class="btn" id="t-stop" hidden>Stop</button>
+            <button type="button" class="btn" id="t-skip" hidden>Skip rest</button>
+          </div>
+        </div>
+
+        <div class="opts">
+          <div class="field">
+            <label for="lead">Lead-in</label>
+            <select id="lead">
+              <option value="10" selected>10 seconds</option>
+              <option value="20">20 seconds</option>
+              <option value="30">30 seconds</option>
+            </select>
+          </div>
+          <label class="chk" for="snd"><input id="snd" type="checkbox" checked>Beeps</label>
+        </div>
+        <p class="note">With a power meter connected, the page measures the average for you. Without one, read the lap average from your head unit when the clock ends. For true maximums, spread the long efforts over different days.</p>
+      </div>
+    </div>
+
+    <div class="stack">
+      <div class="card">
+        <h2>Your best efforts</h2>
+        <div id="rows"></div>
+        <button type="button" class="btn clear" id="clear">Clear results</button>
+        <p class="note">Ratings use the Allen and Coggan power profile tables for 5 s, 1 min, 5 min and 60 min. Rows marked est. are interpolated between those published values.</p>
+      </div>
+      <div class="card">
+        <h2>Power profile</h2>
+        <div id="chart" class="chartbox"></div>
+        <p class="note">W/kg against effort length, with dashed lines for racing categories 4, 2 and 1.</p>
+      </div>
+      <div class="card">
+        <h2>Rider type</h2>
+        <div id="type"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  var DURS=[5,10,30,60,300,600,1200];
+  var DL={5:'5 s',10:'10 s',30:'30 s',60:'1 min',300:'5 min',600:'10 min',1200:'20 min'};
+  var DLONG={5:'5 seconds',10:'10 seconds',30:'30 seconds',60:'1 minute',300:'5 minutes',600:'10 minutes',1200:'20 minutes'};
+  var TIPS={
+    5:'Roll along at a steady 20 to 25 km/h, then sprint flat out from the first second.',
+    10:'Same start as the 5-second sprint. Keep accelerating all the way to the end.',
+    30:'Start hard and stay smooth. The last 10 seconds will hurt, so avoid a wild first few.',
+    60:'Start hard but not at sprint pace. The second half decides your average.',
+    300:'Choose a pace you could only just hold for five minutes and keep it even.',
+    600:'Settle in over the first minute, then hold an even, hard effort.',
+    1200:'Even pacing, as in an FTP test. A steady climb or a trainer works best.'
+  };
+  var REST={5:3,10:3,30:8,60:10,300:15,600:20,1200:30};
+  var ANCH=[5,60,300,3600];
+  var LEVELS=[
+    {n:'Fair',c:'Cat 5'},{n:'Moderate',c:'Cat 4'},{n:'Good',c:'Cat 3'},{n:'Very Good',c:'Cat 2'},
+    {n:'Excellent',c:'Cat 1'},{n:'Exceptional',c:'Domestic pro'},{n:'World Class',c:'International pro'}
+  ];
+  var TAB={
+    m:[[11.9,6.3,3.0,2.4],[13.6,7.0,3.6,3.0],[15.4,7.7,4.2,3.5],[17.5,8.5,4.9,4.1],[19.3,9.2,5.5,4.6],[21.0,9.9,6.2,5.2],[22.8,10.6,6.8,5.6]],
+    f:[[9.7,5.2,2.5,2.0],[11.0,5.8,3.0,2.5],[12.3,6.3,3.6,3.0],[13.8,7.0,4.3,3.6],[15.1,7.5,4.8,4.1],[16.4,8.0,5.4,4.5],[17.7,8.6,6.0,5.0]]
+  };
+  var S={unit:'metric',sex:'m',weightKg:75,res:{}};
+  var T={phase:'idle',sel:30,done:30,total:0,endAt:0,lastSec:null,timer:null,wake:null};
+  var ac=null, lastW=0, clearTimer=null;
+  var live={connected:false,w:0,last:null,hist:[]};
+  var cap={on:false,t0:0,samples:[],prev:null};
+
+  function rnd(x,d){return String(+x.toFixed(d));}
+  function mix(p){return 'color-mix(in srgb, var(--accent) '+p+'%, var(--panel))';}
+  function fmtClock(sec){var m=Math.floor(sec/60),s=sec%60;return m+':'+(s<10?'0':'')+s;}
+  function toKg(x){return S.unit==='metric'?x:x*0.45359237;}
+  function fromKg(x){return S.unit==='metric'?x:x/0.45359237;}
+
+  function thr(li,d){
+    var a=TAB[S.sex][li], i=0;
+    while(i<ANCH.length-2&&d>ANCH[i+1]) i++;
+    var d1=ANCH[i], d2=ANCH[i+1];
+    var t=(Math.log(d)-Math.log(d1))/(Math.log(d2)-Math.log(d1));
+    return a[i]+(a[i+1]-a[i])*t;
+  }
+  function levelFor(d,k){
+    var idx=-1;
+    for(var i=0;i<LEVELS.length;i++){ if(k>=thr(i,d)) idx=i; }
+    return idx;
+  }
+  function score(d,k){
+    var th=[], i;
+    for(i=0;i<LEVELS.length;i++) th.push(thr(i,d));
+    if(k<th[0]) return Math.max(0,k/th[0]);
+    var idx=levelFor(d,k);
+    if(idx>=LEVELS.length-1) return LEVELS.length;
+    return idx+1+(k-th[idx])/(th[idx+1]-th[idx]);
+  }
+
+  /* ---------- persistence ---------- */
+  function save(){
+    try{
+      localStorage.setItem('ppt',JSON.stringify({unit:S.unit,sex:S.sex,weightKg:S.weightKg,res:S.res,lead:$('lead').value,snd:$('snd').checked}));
+    }catch(e){}
+  }
+
+  /* ---------- sound and screen ---------- */
+  function beep(f,ms){
+    if(!$('snd').checked||!ac) return;
+    try{
+      if(ac.state==='suspended') ac.resume();
+      var o=ac.createOscillator(), g=ac.createGain();
+      o.type='sine'; o.frequency.value=f; g.gain.value=0.15;
+      o.connect(g); g.connect(ac.destination);
+      o.start(); o.stop(ac.currentTime+ms/1000);
+    }catch(e){}
+  }
+  function getWake(){
+    try{ if(navigator.wakeLock){ navigator.wakeLock.request('screen').then(function(l){T.wake=l;}).catch(function(){}); } }catch(e){}
+  }
+  function releaseWake(){
+    try{ if(T.wake){ T.wake.release(); T.wake=null; } }catch(e){}
+  }
+
+  /* ---------- timer ---------- */
+  function updateClock(rem){
+    $('clock').textContent=fmtClock(Math.ceil(rem/1000));
+    var pct=T.total>0?(1-rem/T.total)*100:0;
+    $('prog').style.width=Math.min(100,Math.max(0,pct))+'%';
+  }
+  function renderTimer(){
+    var p=T.phase, lab=$('t-label'), tip=$('t-tip');
+    $('timer').setAttribute('data-phase',p);
+    $('t-live').hidden=!(p==='go'&&live.connected);
+    $('enter-box').hidden=(p!=='enter');
+    $('clock').hidden=(p==='enter');
+    $('prog-wrap').hidden=(p==='enter'||p==='idle');
+    $('t-btns').hidden=(p==='enter');
+    $('t-start').hidden=(p!=='idle');
+    $('t-stop').hidden=!(p==='ready'||p==='go');
+    $('t-skip').hidden=(p!=='rest');
+    if(p==='idle'){
+      lab.textContent='Selected: '+DLONG[T.sel];
+      tip.textContent=TIPS[T.sel];
+      $('clock').textContent=fmtClock(T.sel);
+      $('prog').style.width='0%';
+    }else if(p==='ready'){
+      lab.textContent='Get ready for '+DLONG[T.sel];
+      tip.textContent='Roll along easily. The effort starts when the clock reaches zero.';
+    }else if(p==='go'){
+      lab.textContent='Go: '+DLONG[T.sel];
+      tip.textContent='Hold it to the end. The average power is what counts.';
+    }else if(p==='enter'){
+      lab.textContent='Effort complete';
+      tip.textContent='';
+      var prev=S.res[T.sel];
+      $('entry-hint').textContent='Use the lap or interval average from your head unit.'+(prev?' Saved now: '+prev+' W, which this will replace.':'');
+    }else if(p==='rest'){
+      lab.textContent='Recover after '+DLONG[T.done];
+      tip.textContent='Spin easily. Skip when you feel ready for the next effort.';
+    }
+    DURS.forEach(function(d){
+      var c=$('c'+d);
+      c.setAttribute('aria-pressed',String(d===T.sel));
+      c.disabled=(p!=='idle');
+    });
+  }
+  function startPhase(p,seconds){
+    T.phase=p; T.total=seconds*1000; T.endAt=performance.now()+T.total; T.lastSec=null;
+    if(T.timer) clearInterval(T.timer);
+    T.timer=setInterval(tick,100);
+    renderTimer();
+    tick();
+  }
+  function tick(){
+    var rem=Math.max(0,T.endAt-performance.now()), sec=Math.ceil(rem/1000);
+    if(sec!==T.lastSec){
+      T.lastSec=sec;
+      if((T.phase==='ready'||(T.phase==='go'&&T.sel>=10))&&sec>=1&&sec<=3) beep(880,120);
+    }
+    updateClock(rem);
+    if(cap.on) updateLiveAvg();
+    if(rem<=0){
+      clearInterval(T.timer); T.timer=null;
+      phaseEnd();
+    }
+  }
+  function phaseEnd(){
+    if(T.phase==='ready'){
+      beep(1320,500);
+      startPhase('go',T.sel);
+      cap.on=true; cap.t0=performance.now(); cap.samples=[]; cap.prev=live.last;
+    }else if(T.phase==='go'){
+      beep(1320,300);
+      setTimeout(function(){beep(1320,600);},380);
+      releaseWake();
+      var meas=finishCapture();
+      T.phase='enter';
+      renderTimer();
+      $('entry').value=(meas&&meas.avg>0)?String(Math.round(meas.avg)):'';
+      showMeasured(meas);
+      try{ $('entry').focus(); }catch(e){}
+    }else if(T.phase==='rest'){
+      beep(660,300);
+      T.phase='idle';
+      renderTimer();
+    }
+  }
+  function abort(){
+    cap.on=false;
+    if(T.timer){ clearInterval(T.timer); T.timer=null; }
+    releaseWake();
+    T.phase='idle';
+    renderTimer();
+  }
+  function nextEmpty(from){
+    var i=DURS.indexOf(from), n=DURS.length, j, d;
+    for(j=1;j<=n;j++){
+      d=DURS[(i+j)%n];
+      if(!S.res[d]) return d;
+    }
+    return null;
+  }
+
+  /* ---------- results ---------- */
+  function levelHtml(d,k){
+    var idx=levelFor(d,k);
+    var est=ANCH.indexOf(d)<0&&d!==3600?'<em>est.</em>':'';
+    if(idx<0) return '<i class="zs" style="background:'+mix(8)+'"></i>Untrained'+est;
+    return '<i class="zs" style="background:'+mix(22+idx*13)+'"></i>'+LEVELS[idx].n+est+'<small>'+LEVELS[idx].c+'</small>';
+  }
+  function renderRows(){
+    var kg=S.weightKg;
+    DURS.forEach(function(d){
+      var w=S.res[d], k=(w>0&&kg>0)?w/kg:NaN;
+      $('k'+d).innerHTML=isFinite(k)?k.toFixed(2)+'<small>W/kg</small>':'—';
+      $('l'+d).innerHTML=isFinite(k)?levelHtml(d,k):'';
+      $('cs'+d).textContent=isFinite(k)?k.toFixed(1)+' W/kg':(w>0?w+' W':'—');
+    });
+  }
+
+  function drawChart(){
+    var box=$('chart');
+    var W=Math.max(280,Math.floor(box.clientWidth)||320), H=260;
+    lastW=W;
+    var pad={l:34,r:14,t:18,b:30};
+    var lnMin=Math.log(5), lnMax=Math.log(1200);
+    var sx=function(d){return pad.l+(W-pad.l-pad.r)*(Math.log(d)-lnMin)/(lnMax-lnMin);};
+    var kg=S.weightKg, pts=[], i;
+    DURS.forEach(function(d){ var w=S.res[d]; if(w>0&&kg>0) pts.push([d,w/kg]); });
+    var refIdx=[1,3,4], refNames=['Cat 4','Cat 2','Cat 1'];
+    var rawMax=thr(4,5);
+    pts.forEach(function(p){ rawMax=Math.max(rawMax,p[1]); });
+    rawMax*=1.06;
+    var steps=[1,2,4,5,10], st=10;
+    for(i=0;i<steps.length;i++){ if(rawMax/steps[i]<=6){ st=steps[i]; break; } }
+    var yMax=Math.ceil(rawMax/st)*st;
+    var sy=function(v){return H-pad.b-(H-pad.t-pad.b)*v/yMax;};
+    var s='';
+    for(var y=0;y<=yMax;y+=st){
+      s+='<line class="grid" x1="'+pad.l+'" x2="'+(W-pad.r)+'" y1="'+sy(y)+'" y2="'+sy(y)+'"/>';
+      s+='<text class="tick" x="'+(pad.l-6)+'" y="'+(sy(y)+4)+'" text-anchor="end">'+y+'</text>';
+    }
+    DURS.forEach(function(d){
+      s+='<text class="tick" x="'+sx(d)+'" y="'+(H-pad.b+18)+'" text-anchor="middle">'+DL[d].replace(' ','')+'</text>';
+    });
+    s+='<line class="axis" x1="'+pad.l+'" x2="'+(W-pad.r)+'" y1="'+sy(0)+'" y2="'+sy(0)+'"/>';
+    refIdx.forEach(function(li,ri){
+      var dp='', j, d;
+      for(j=0;j<=40;j++){
+        d=5*Math.pow(1200/5,j/40);
+        dp+=(j?'L':'M')+sx(d).toFixed(1)+' '+sy(thr(li,d)).toFixed(1)+' ';
+      }
+      s+='<path class="ref" d="'+dp+'"/>';
+      s+='<text class="rlab" x="'+(pad.l+4)+'" y="'+(sy(thr(li,5))-5)+'">'+refNames[ri]+'</text>';
+    });
+    if(pts.length){
+      var d2=pts.map(function(p,ix){return (ix?'L':'M')+sx(p[0]).toFixed(1)+' '+sy(p[1]).toFixed(1);}).join(' ');
+      if(pts.length>1) s+='<path class="ln" d="'+d2+'"/>';
+      pts.forEach(function(p){
+        s+='<circle class="pt" cx="'+sx(p[0])+'" cy="'+sy(p[1])+'" r="5"/>';
+        s+='<text class="plab" x="'+sx(p[0])+'" y="'+Math.max(sy(p[1])-10,pad.t+6)+'" text-anchor="middle">'+p[1].toFixed(1)+'</text>';
+      });
+    }else{
+      s+='<text class="tick" x="'+(W/2)+'" y="'+((H-pad.b)/2+pad.t)+'" text-anchor="middle">Save an effort to draw your curve</text>';
+    }
+    box.innerHTML='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Power profile: watts per kilogram against effort length, with racing category benchmarks">'+s+'</svg>';
+  }
+
+  function renderType(){
+    var kg=S.weightKg, el=$('type');
+    if(!(kg>0)){ el.innerHTML='<p class="typp">Enter your weight to see your rider type.</p>'; return; }
+    var sc={}, logged=0;
+    DURS.forEach(function(d){ var w=S.res[d]; if(w>0){ sc[d]=score(d,w/kg); logged++; } });
+    var groups={s:[5,10,30],m:[60,300],l:[600,1200]};
+    var names={s:'Sprinter',m:'Pursuiter',l:'Time trialist'};
+    var mean={}, keys=[], g;
+    ['s','m','l'].forEach(function(g){
+      var v=groups[g].filter(function(d){return sc[d]!==undefined;}).map(function(d){return sc[d];});
+      if(v.length){ mean[g]=v.reduce(function(a,b){return a+b;},0)/v.length; keys.push(g); }
+    });
+    if(keys.length<2){
+      el.innerHTML='<p class="typp">Log at least one short effort (5 to 30 s), one middle (1 to 5 min) or one long (10 to 20 min), across two of those groups, to see where you are strongest.</p>';
+      return;
+    }
+    var best=keys[0];
+    keys.forEach(function(k){ if(mean[k]>mean[best]) best=k; });
+    var others=keys.filter(function(k){return k!==best;});
+    var om=others.reduce(function(a,k){return a+mean[k];},0)/others.length;
+    var type=(mean[best]-om>=0.6)?names[best]:'All-rounder';
+    var sd=Object.keys(sc).map(Number);
+    var hi=sd[0], lo=sd[0];
+    sd.forEach(function(d){ if(sc[d]>sc[hi]) hi=d; if(sc[d]<sc[lo]) lo=d; });
+    function lvName(d){ var idx=levelFor(d,S.res[d]/kg); return idx<0?'Untrained':LEVELS[idx].n; }
+    var blurb={
+      'Sprinter':'Your short, explosive efforts rate highest.',
+      'Pursuiter':'Your one to five minute efforts rate highest.',
+      'Time trialist':'Your long, steady efforts rate highest.',
+      'All-rounder':'Your ratings are fairly even across short, middle and long efforts.'
+    }[type];
+    var html='<p class="typ">'+type+'</p><p class="typp">'+blurb+'</p>';
+    if(logged>=2&&hi!==lo){
+      html+='<p class="typp">Strongest: <b>'+DL[hi]+'</b> ('+lvName(hi)+'). Weakest: <b>'+DL[lo]+'</b> ('+lvName(lo)+').</p>';
+    }
+    el.innerHTML=html;
+  }
+
+  function render(){
+    renderRows();
+    drawChart();
+    renderType();
+  }
+
+  /* ---------- build ---------- */
+  $('chips').innerHTML=DURS.map(function(d){
+    return '<button type="button" class="chip" id="c'+d+'" aria-pressed="false"><span>'+DL[d]+'</span><small id="cs'+d+'">—</small></button>';
+  }).join('');
+  $('rows').innerHTML=DURS.map(function(d){
+    return '<div class="row"><label class="dl" for="w'+d+'">'+DL[d]+'</label>'
+      +'<div class="in"><input id="w'+d+'" type="number" inputmode="decimal" min="0" step="1" placeholder="Average"><span class="suf">W</span></div>'
+      +'<div class="res"><span class="k" id="k'+d+'">—</span><span class="lv" id="l'+d+'"></span></div></div>';
+  }).join('');
+
+  /* ---------- restore ---------- */
+  try{
+    var sv=JSON.parse(localStorage.getItem('ppt')||'null');
+    if(sv){
+      if(sv.unit==='imperial') S.unit='imperial';
+      if(sv.sex==='f') S.sex='f';
+      if(isFinite(sv.weightKg)&&sv.weightKg>0) S.weightKg=sv.weightKg;
+      if(sv.res&&typeof sv.res==='object'){
+        DURS.forEach(function(d){ var v=parseFloat(sv.res[d]); if(v>0) S.res[d]=v; });
+      }
+      if(sv.lead) $('lead').value=String(sv.lead);
+      if(sv.snd===false) $('snd').checked=false;
+    }
+  }catch(e){}
+
+  function syncUnitUi(){
+    Array.prototype.forEach.call(document.querySelectorAll('[data-kind="mass"]'),function(el){ el.textContent=S.unit==='metric'?'kg':'lb'; });
+    $('u-metric').setAttribute('aria-pressed',String(S.unit==='metric'));
+    $('u-imperial').setAttribute('aria-pressed',String(S.unit==='imperial'));
+    $('weight').value=rnd(fromKg(S.weightKg),1);
+  }
+  syncUnitUi();
+  $('sex').value=S.sex;
+  DURS.forEach(function(d){ if(S.res[d]) $('w'+d).value=S.res[d]; });
+
+  /* ---------- events ---------- */
+  document.addEventListener('input',function(e){
+    var id=e.target.id;
+    if(id==='weight'){
+      var v=parseFloat(e.target.value);
+      S.weightKg=(isFinite(v)&&v>0)?toKg(v):NaN;
+      save(); render(); renderLive();
+    }else if(/^w\d+$/.test(id)){
+      var d=parseInt(id.slice(1),10), w=parseFloat(e.target.value);
+      if(isFinite(w)&&w>0) S.res[d]=w; else delete S.res[d];
+      save(); render();
+    }
+  });
+  $('sex').addEventListener('change',function(){ S.sex=$('sex').value; save(); render(); });
+  $('lead').addEventListener('change',save);
+  $('snd').addEventListener('change',save);
+  $('u-metric').addEventListener('click',function(){ if(S.unit!=='metric'){ S.unit='metric'; syncUnitUi(); save(); } });
+  $('u-imperial').addEventListener('click',function(){ if(S.unit!=='imperial'){ S.unit='imperial'; syncUnitUi(); save(); } });
+
+  DURS.forEach(function(d){
+    $('c'+d).addEventListener('click',function(){ if(T.phase==='idle'){ T.sel=d; renderTimer(); } });
+  });
+  $('t-start').addEventListener('click',function(){
+    try{
+      if(!ac){ ac=new (window.AudioContext||window.webkitAudioContext)(); }
+      if(ac.state==='suspended') ac.resume();
+    }catch(e){}
+    getWake();
+    startPhase('ready',parseInt($('lead').value,10)||10);
+  });
+  $('t-stop').addEventListener('click',abort);
+  $('t-skip').addEventListener('click',abort);
+  $('t-discard').addEventListener('click',abort);
+  $('t-save').addEventListener('click',function(){
+    var v=parseFloat($('entry').value);
+    if(!isFinite(v)||v<=0||v>3000){ $('entry').focus(); return; }
+    var d=T.sel;
+    S.res[d]=Math.round(v);
+    $('w'+d).value=S.res[d];
+    save();
+    T.done=d;
+    var nx=nextEmpty(d);
+    if(nx) T.sel=nx;
+    render();
+    startPhase('rest',REST[d]*60);
+  });
+  $('clear').addEventListener('click',function(){
+    var b=$('clear');
+    if(clearTimer===null){
+      b.textContent='Tap again to clear all results';
+      clearTimer=setTimeout(function(){ b.textContent='Clear results'; clearTimer=null; },4000);
+    }else{
+      clearTimeout(clearTimer); clearTimer=null;
+      b.textContent='Clear results';
+      S.res={};
+      DURS.forEach(function(d){ $('w'+d).value=''; });
+      save(); render();
+    }
+  });
+
+  /* ---------- Bluetooth power meter (Web Bluetooth) ---------- */
+  var btDev=null;
+  function setStatus(t){ $('bt-status').textContent=t; }
+  function renderBtUi(){
+    $('bt-connect').hidden=live.connected;
+    $('bt-disconnect').hidden=!live.connected;
+    $('livegrid').hidden=!live.connected;
+  }
+  function renderLive(){
+    var h=live.hist, a=0;
+    if(h.length){ a=h.reduce(function(s,x){return s+x.p;},0)/h.length; }
+    $('lv-w').textContent=Math.round(live.w);
+    $('lv-a').textContent=Math.round(a);
+    $('lv-k').textContent=(S.weightKg>0?(live.w/S.weightKg):0).toFixed(1);
+  }
+  function onPower(p){
+    var now=performance.now();
+    live.w=p; live.last={t:now,p:p};
+    live.hist.push({t:now,p:p});
+    while(live.hist.length&&now-live.hist[0].t>3000) live.hist.shift();
+    if(cap.on) cap.samples.push({t:now,p:p});
+    renderLive();
+  }
+  /* Cycling Power Measurement: flags uint16, then instantaneous power sint16 (W). */
+  function parseCyclingPower(dv){
+    return dv.byteLength>=4?dv.getInt16(2,true):null;
+  }
+  /* FTMS Indoor Bike Data: walk the optional fields to reach instantaneous power. */
+  function parseBikeData(dv){
+    if(dv.byteLength<2) return null;
+    var f=dv.getUint16(0,true), o=2;
+    if(!(f&1)) o+=2;
+    if(f&2) o+=2;
+    if(f&4) o+=2;
+    if(f&8) o+=2;
+    if(f&16) o+=3;
+    if(f&32) o+=2;
+    if((f&64)&&dv.byteLength>=o+2) return dv.getInt16(o,true);
+    return null;
+  }
+  async function connectBt(){
+    if(!navigator.bluetooth){ initBt(); return; }
+    try{
+      setStatus('Choose your device in the browser prompt.');
+      var dev=await navigator.bluetooth.requestDevice({
+        filters:[{services:['cycling_power']},{services:['fitness_machine']}],
+        optionalServices:['cycling_power','fitness_machine']
+      });
+      setStatus('Connecting to '+(dev.name||'your device')+'...');
+      dev.addEventListener('gattserverdisconnected',onBtLost);
+      var server=await dev.gatt.connect();
+      var ch=null, kind='';
+      try{
+        var svc=await server.getPrimaryService('cycling_power');
+        ch=await svc.getCharacteristic('cycling_power_measurement');
+        kind='cp';
+      }catch(e1){
+        var svc2=await server.getPrimaryService('fitness_machine');
+        ch=await svc2.getCharacteristic('indoor_bike_data');
+        kind='ftms';
+      }
+      ch.addEventListener('characteristicvaluechanged',function(ev){
+        var dv=ev.target.value;
+        var p=(kind==='cp')?parseCyclingPower(dv):parseBikeData(dv);
+        if(p!==null&&isFinite(p)) onPower(Math.max(0,p));
+      });
+      await ch.startNotifications();
+      btDev=dev;
+      live.connected=true; live.hist=[]; live.w=0; live.last=null;
+      setStatus('Connected to '+(dev.name||'your device')+(kind==='cp'?' (power meter).':' (smart trainer).')+' Start pedalling to see watts.');
+      renderBtUi(); renderLive(); renderTimer();
+    }catch(err){
+      live.connected=false;
+      if(err&&err.name==='NotFoundError') setStatus('No device chosen. Wake your power meter by pedalling, then try again.');
+      else setStatus('Could not connect: '+((err&&err.message)?err.message:'unknown error')+'. Check the device is awake and not paired to another app.');
+      renderBtUi();
+    }
+  }
+  function onBtLost(){
+    live.connected=false;
+    setStatus('Disconnected. Press Connect to pair again.');
+    renderBtUi(); renderTimer();
+  }
+  function disconnectBt(){
+    try{ if(btDev&&btDev.gatt&&btDev.gatt.connected) btDev.gatt.disconnect(); }catch(e){}
+    onBtLost();
+  }
+  function initBt(){
+    if(!navigator.bluetooth){
+      setStatus('This browser cannot use Bluetooth, so type in your watts after each effort. For live power from a Bluetooth meter, open this page in Chrome or Edge, or on an iPhone in the free Bluefy browser.');
+      $('bt-connect').disabled=true;
+    }
+  }
+  $('bt-connect').addEventListener('click',connectBt);
+  $('bt-disconnect').addEventListener('click',disconnectBt);
+
+  /* Average power over the effort window. Each reading holds until the next one, for at most 3 s. */
+  function calcCap(tEnd){
+    var t0=cap.t0, win=Math.max(1,tEnd-t0), pts=[], i;
+    if(cap.prev&&t0-cap.prev.t<=3000) pts.push({t:t0,p:cap.prev.p});
+    cap.samples.forEach(function(x){ if(x.t<=tEnd) pts.push(x); });
+    var energy=0, covered=0;
+    for(i=0;i<pts.length;i++){
+      var a=Math.max(pts[i].t,t0);
+      var nxt=(i+1<pts.length)?pts[i+1].t:tEnd;
+      var b=Math.min(nxt,pts[i].t+3000,tEnd);
+      if(b>a){ energy+=pts[i].p*(b-a); covered+=(b-a); }
+    }
+    return {avg:energy/win,coverage:covered/win,n:cap.samples.length};
+  }
+  function updateLiveAvg(){
+    var r=calcCap(Math.min(performance.now(),T.endAt));
+    $('t-live').textContent='Average so far: '+Math.round(r.avg)+' W'+(S.weightKg>0?' · '+(r.avg/S.weightKg).toFixed(2)+' W/kg':'');
+  }
+  function finishCapture(){
+    var wasOn=cap.on;
+    cap.on=false;
+    if(!wasOn||!cap.samples.length) return null;
+    return calcCap(T.endAt);
+  }
+  function showMeasured(m){
+    if(!m) return;
+    var txt='Measured from your power meter: '+Math.round(m.avg)+' W from '+m.n+' readings.';
+    if(m.coverage<0.85) txt+=' Only '+Math.round(m.coverage*100)+'% of the effort had power data, so check this against your head unit.';
+    var prev=S.res[T.sel];
+    if(prev) txt+=' Saved now: '+prev+' W, which this will replace.';
+    $('entry-hint').textContent=txt;
+  }
+  initBt();
+  renderBtUi();
+  try{
+    if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0) navigator.serviceWorker.register('sw.js');
+  }catch(e){}
+
+  renderTimer();
+  render();
+
+  if('ResizeObserver' in window){
+    new ResizeObserver(function(){
+      var w=Math.floor($('chart').clientWidth);
+      if(w&&Math.abs(w-lastW)>2) drawChart();
+    }).observe($('chart'));
+  }else{
+    window.addEventListener('resize',drawChart);
+  }
+})();
+</script>
+</body>
+</html>
